@@ -11,6 +11,7 @@ import (
 // Content is a Content model.
 type Content struct {
 	ID             int64         `json:"id"`
+	ContentID      string        `json:"content_id"`
 	Title          string        `json:"title" binding:"required"`
 	VideoURL       string        `json:"video_url" binding:"required"`
 	Author         string        `json:"author" binding:"required"`

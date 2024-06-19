@@ -3,11 +3,16 @@ package data
 import (
 	"content_manage/internal/biz"
 	"context"
+	"fmt"
+	"hash/fnv"
+	"math/big"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"gorm.io/gorm"
 )
+
+const contentNumTables = 4
 
 type contentRepo struct {
 	data *Data
@@ -23,8 +28,9 @@ func NewContentRepo(data *Data, logger log.Logger) biz.ContentRepo {
 }
 
 type ContentDetail struct {
-	ID             int64         `gorm:"column:id;primaryKey"`   // 内容ID
-	Title          string        `gorm:"column:title"`           // 内容标题
+	ID             int64         `gorm:"column:id;primaryKey"` // 内容ID
+	Title          string        `gorm:"column:title"`         // 内容标题
+	ContentID      string        `gorm:"column:content_id"`
 	Description    string        `gorm:"column:description"`     // 内容描述
 	Author         string        `gorm:"column:author"`          // 作者
 	VideoURL       string        `gorm:"column:video_url"`       // 视频链接
@@ -40,14 +46,59 @@ type ContentDetail struct {
 	UpdatedAt      time.Time     `gorm:"column:updated_at"`      // 更新时间
 }
 
-func (*ContentDetail) TableName() string {
-	return "cms_content.t_content_details"
+// func (*ContentDetail) TableName() string {
+// 	return "cms_content.t_content_details"
+// }
+
+type IdxContentDetail struct {
+	ID        int64     `gorm:"column:id;primaryKey"`
+	ContentID string    `gorm:"column:content_id"`
+	Title     string    `gorm:"column:title"`
+	Author    string    `gorm:"column:author"`
+	CreatedAt time.Time `gorm:"column:created_at"`
+	UpdatedAt time.Time `gorm:"column:updated_at"`
+}
+
+func (c *IdxContentDetail) TableName() string {
+	return "cms_content.t_idx_content_details"
+}
+
+func getContentDetailTable(contentID string) string {
+	tableIndex := getContentTableIndex(contentID)
+	table := fmt.Sprintf("cms_content.t_content_details_%d", tableIndex)
+	log.Infof("content_id = %s, table = %s", contentID, table)
+	return table
+}
+
+func getContentTableIndex(uuid string) int {
+	hash := fnv.New64()
+	hash.Write([]byte(uuid))
+	hashValue := hash.Sum64()
+	fmt.Println("hashValue = ", hashValue)
+
+	bigNum := big.NewInt(int64(hashValue))
+	mod := big.NewInt(contentNumTables)
+	tableIndex := bigNum.Mod(bigNum, mod).Int64()
+	return int(tableIndex)
 }
 
 func (c *contentRepo) Create(ctx context.Context, content *biz.Content) (int64, error) {
 	c.log.Infof("contentRepo Create content = %+v", content)
+	db := c.data.db
+
+	idx := IdxContentDetail{
+		ContentID: content.ContentID,
+		Title:     content.Title,
+		Author:    content.Author,
+	}
+	if err := db.Create(&idx).Error; err != nil {
+		c.log.Errorf("content create error = %v\n", err)
+		return 0, err
+	}
+
 	detail := ContentDetail{
 		Title:          content.Title,
+		ContentID:      content.ContentID,
 		Description:    content.Description,
 		Author:         content.Author,
 		VideoURL:       content.VideoURL,
@@ -60,19 +111,23 @@ func (c *contentRepo) Create(ctx context.Context, content *biz.Content) (int64, 
 		Quality:        content.Quality,
 		ApprovalStatus: content.ApprovalStatus,
 	}
-	db := c.data.db
-	if err := db.Create(&detail).Error; err != nil {
+
+	if err := db.Table(getContentDetailTable(content.ContentID)).Create(&detail).Error; err != nil {
 		c.log.Errorf("content create error = %v\n", err)
 		return 0, err
 	}
-	return detail.ID, nil
+	return idx.ID, nil
 }
 
 func (c *contentRepo) Update(ctx context.Context, id int64, content *biz.Content) error {
 	c.log.Infof("contentRepo Update content = %+v", content)
 	db := c.data.db
+	var idx IdxContentDetail
+	if err := db.Where("id = ?", id).First(&idx).Error; err != nil {
+		return err
+	}
+
 	detail := ContentDetail{
-		ID:             content.ID,
 		Title:          content.Title,
 		Description:    content.Description,
 		Author:         content.Author,
@@ -86,7 +141,7 @@ func (c *contentRepo) Update(ctx context.Context, id int64, content *biz.Content
 		Quality:        content.Quality,
 		ApprovalStatus: content.ApprovalStatus,
 	}
-	if err := db.Where("id = ?", id).Updates(&detail).Error; err != nil {
+	if err := db.Table(getContentDetailTable(idx.ContentID)).Where("content_id = ?", idx.ContentID).Updates(&detail).Error; err != nil {
 		c.log.Errorf("content update error = %v\n", err)
 		return err
 	}

@@ -9,12 +9,16 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func (a *AppService) CreateContent(ctx context.Context, req *operate.CreateContentReq) (*operate.CreateContentRsp, error) {
 	content := req.GetContent()
 	uc := a.uc
+	contentID := uuid.New().String()
 	id, err := uc.CreateContent(ctx, &biz.Content{
+		ContentID:      contentID,
 		Title:          content.GetTitle(),
 		VideoURL:       content.GetVideoUrl(),
 		Author:         content.GetAuthor(),
