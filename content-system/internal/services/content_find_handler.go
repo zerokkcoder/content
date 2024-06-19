@@ -33,7 +33,7 @@ func (ca *CmsApp) ContentFind(c *gin.Context) {
 		PageSize: req.PageSize,
 	})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
 		return

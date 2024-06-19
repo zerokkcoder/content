@@ -5,8 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/zerokkcoder/content-system/internal/dao"
-	"github.com/zerokkcoder/content-system/internal/model"
+	"github.com/zerokkcoder/content-system/internal/api/operate"
 )
 
 type ContentCreateReq struct {
@@ -20,8 +19,8 @@ type ContentCreateReq struct {
 	Resolution     string        `json:"resolution"`
 	FileSize       int64         `json:"file_size"`
 	Format         string        `json:"format"`
-	Quality        int           `json:"quality"`
-	ApprovalStatus int           `json:"approval_status"`
+	Quality        int32         `json:"quality"`
+	ApprovalStatus int32         `json:"approval_status"`
 	UpdatedAt      time.Time     `json:"updated_at"`
 	CreatedAt      time.Time     `json:"created_at"`
 }
@@ -38,20 +37,23 @@ func (ca *CmsApp) ContentCreate(c *gin.Context) {
 		})
 		return
 	}
-	contentDao := dao.NewContentDao(ca.db)
-	_, err := contentDao.Create(&model.ContentDetail{
-		Title:          req.Title,
-		Description:    req.Description,
-		Author:         req.Author,
-		VideoURL:       req.VideoURL,
-		Thumbnail:      req.Thumbnail,
-		Category:       req.Category,
-		Duration:       req.Duration,
-		Resolution:     req.Resolution,
-		FileSize:       req.FileSize,
-		Format:         req.Format,
-		Quality:        req.Quality,
-		ApprovalStatus: req.ApprovalStatus,
+
+	// 远程调用
+	rsp, err := ca.operationAppClient.CreateContent(c, &operate.CreateContentReq{
+		Content: &operate.Content{
+			Title:          req.Title,
+			Description:    req.Description,
+			Author:         req.Author,
+			VideoUrl:       req.VideoURL,
+			Thumbnail:      req.Thumbnail,
+			Category:       req.Category,
+			Duration:       req.Duration.Microseconds(),
+			Resolution:     req.Resolution,
+			FileSize:       req.FileSize,
+			Format:         req.Format,
+			Quality:        req.Quality,
+			ApprovalStatus: req.ApprovalStatus,
+		},
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -76,6 +78,6 @@ func (ca *CmsApp) ContentCreate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"code": 0,
 		"msg":  "ok",
-		"data": ContentCreateRsp{Message: "ok"},
+		"data": rsp,
 	})
 }
