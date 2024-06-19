@@ -3,8 +3,9 @@ package model
 import "time"
 
 type ContentDetail struct {
-	ID             int64         `gorm:"column:id;primaryKey"`   // 内容ID
-	Title          string        `gorm:"column:title"`           // 内容标题
+	ID             int64         `gorm:"column:id;primaryKey"` // 内容ID
+	Title          string        `gorm:"column:title"`         // 内容标题
+	ContentID      string        `gorm:"column:content_id"`
 	Description    string        `gorm:"column:description"`     // 内容描述
 	Author         string        `gorm:"column:author"`          // 作者
 	VideoURL       string        `gorm:"column:video_url"`       // 视频链接
@@ -20,6 +21,6 @@ type ContentDetail struct {
 	UpdatedAt      time.Time     `gorm:"column:updated_at"`      // 更新时间
 }
 
-func (*ContentDetail) TableName() string {
-	return "cms_content.t_content_details"
-}
+// func (*ContentDetail) TableName() string {
+// 	return "cms_content.t_content_details"
+// }

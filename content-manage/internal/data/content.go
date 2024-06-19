@@ -148,10 +148,10 @@ func (c *contentRepo) Update(ctx context.Context, id int64, content *biz.Content
 	return nil
 }
 
-func (c *contentRepo) IsExist(ctx context.Context, contentID int64) (bool, error) {
+func (c *contentRepo) IsExist(ctx context.Context, id int64) (bool, error) {
 	db := c.data.db
-	var detail ContentDetail
-	err := db.Where("id = ?", contentID).First(&detail).Error
+	var detail IdxContentDetail
+	err := db.Where("id = ?", id).First(&detail).Error
 	if err == gorm.ErrRecordNotFound {
 		return false, nil
 	}
@@ -164,8 +164,20 @@ func (c *contentRepo) IsExist(ctx context.Context, contentID int64) (bool, error
 
 func (c *contentRepo) Delete(ctx context.Context, id int64) error {
 	db := c.data.db
-	if err := db.Where("id = ?", id).Delete(&ContentDetail{}).Error; err != nil {
-		c.log.WithContext(ctx).Errorf("ContentDao Delete error = %v\n", err)
+	// 查询索引表信息
+	var idx IdxContentDetail
+	if err := db.Where("id = ?", id).First(&idx).Error; err != nil {
+		return err
+	}
+	// 删除索引信息
+	if err := db.Where("id = ?", id).Delete(&IdxContentDetail{}).Error; err != nil {
+		c.log.WithContext(ctx).Errorf("ContentDao IdxContentDetail Delete error = %v\n", err)
+		return err
+	}
+	// 删除详情信息
+	if err := db.Table(getContentDetailTable(idx.ContentID)).
+		Where("content_id = ?", idx.ContentID).Delete(&ContentDetail{}).Error; err != nil {
+		c.log.WithContext(ctx).Errorf("ContentDao ContentDetail Delete error = %v\n", err)
 		return err
 	}
 	return nil
@@ -225,4 +237,81 @@ func (c *contentRepo) Find(ctx context.Context, params *biz.FindParams) ([]*biz.
 	}
 
 	return contents, total, nil
+}
+
+func (c *contentRepo) FindIndex(ctx context.Context, params *biz.FindParams) ([]*biz.ContentIndex, int64, error) {
+	// 构建查询条件
+	query := c.data.db.Model(&IdxContentDetail{})
+	if params.ID != 0 {
+		query = query.Where("id = ?", params.ID)
+	}
+	if params.Author != "" {
+		query = query.Where("author = ?", params.Author)
+	}
+	if params.Title != "" {
+		query = query.Where("title LIKE ?", "%"+params.Title+"%")
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var page, pageSize = 1, 10
+	if params.Page > 0 {
+		page = int(params.Page)
+	}
+	if params.PageSize > 0 {
+		pageSize = int(params.PageSize)
+	}
+	offset := (page - 1) * pageSize
+	var results []*IdxContentDetail
+	if err := query.Offset(offset).
+		Limit(pageSize).
+		Find(&results).Error; err != nil {
+		c.log.WithContext(ctx).Errorf("contentRepo FindIndex error = %v\n", err)
+		return nil, 0, err
+	}
+
+	var contents []*biz.ContentIndex
+	for _, v := range results {
+		contents = append(contents, &biz.ContentIndex{
+			ID:        v.ID,
+			ContentID: v.ContentID,
+		})
+	}
+
+	c.log.Infof("contentRepo FindIndex content = %+v", contents)
+
+	return contents, total, nil
+}
+
+func (c *contentRepo) First(ctx context.Context, idx *biz.ContentIndex) (*biz.Content, error) {
+	db := c.data.db
+	var detail ContentDetail
+	c.log.Infof("contentRepo First ContentID = %s", idx.ContentID)
+	if err := db.Table(getContentDetailTable(idx.ContentID)).
+		Where("content_id = ?", idx.ContentID).First(&detail).Error; err != nil {
+		c.log.WithContext(ctx).Errorf("contentRepo First error = %v\n", err)
+		return nil, err
+	}
+
+	content := &biz.Content{
+		ID:             idx.ID,
+		ContentID:      idx.ContentID,
+		Title:          detail.Title,
+		VideoURL:       detail.VideoURL,
+		Author:         detail.Author,
+		Description:    detail.Description,
+		Thumbnail:      detail.Thumbnail,
+		Category:       detail.Category,
+		Duration:       detail.Duration,
+		Resolution:     detail.Resolution,
+		FileSize:       detail.FileSize,
+		Format:         detail.Format,
+		Quality:        detail.Quality,
+		ApprovalStatus: detail.ApprovalStatus,
+		UpdatedAt:      detail.UpdatedAt,
+		CreatedAt:      detail.CreatedAt,
+	}
+	return content, nil
 }

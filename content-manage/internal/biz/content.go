@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"golang.org/x/sync/errgroup"
 )
 
 // Content is a Content model.
@@ -36,6 +37,11 @@ type FindParams struct {
 	PageSize int32
 }
 
+type ContentIndex struct {
+	ID        int64
+	ContentID string
+}
+
 // ContentRepo is a Content repo.
 type ContentRepo interface {
 	Create(ctx context.Context, c *Content) (int64, error)
@@ -43,6 +49,8 @@ type ContentRepo interface {
 	IsExist(ctx context.Context, id int64) (bool, error)
 	Delete(ctx context.Context, id int64) error
 	Find(ctx context.Context, params *FindParams) ([]*Content, int64, error)
+	FindIndex(ctx context.Context, params *FindParams) ([]*ContentIndex, int64, error)
+	First(ctx context.Context, idx *ContentIndex) (*Content, error)
 }
 
 // ContentUsecase is a Content usecase.
@@ -86,5 +94,27 @@ func (uc *ContentUsecase) DeleteContent(ctx context.Context, id int64) error {
 // FindContent finds a Content by ID.
 func (uc *ContentUsecase) FindContent(ctx context.Context, params *FindParams) ([]*Content, int64, error) {
 	uc.log.WithContext(ctx).Infof("FindContent: %v", params)
-	return uc.repo.Find(ctx, params)
+	repo := uc.repo
+	indices, total, err := repo.FindIndex(ctx, params)
+	if err != nil {
+		return nil, 0, err
+	}
+	var eg errgroup.Group
+	contents := make([]*Content, len(indices))
+	for index, idx := range indices {
+		tempIndex := index
+		tempIdx := idx
+		eg.Go(func() error {
+			content, err := repo.First(ctx, tempIdx)
+			if err != nil {
+				return err
+			}
+			contents[tempIndex] = content
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return nil, 0, err
+	}
+	return contents, total, nil
 }

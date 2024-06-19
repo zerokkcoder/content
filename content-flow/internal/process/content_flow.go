@@ -65,19 +65,19 @@ func (c *ContentFlow) flowHandle(workflow *flow.Workflow, context *flow.Context)
 // input 输入节点
 func (c *ContentFlow) input(data []byte, option map[string][]string) ([]byte, error) {
 	fmt.Println("exec input")
-	var input map[string]int64
+	var input map[string]string
 	if err := json.Unmarshal(data, &input); err != nil {
 		return nil, err
 	}
-	id := input["content_id"]
-	detail, err := c.contentDao.First(id)
+	contentID := input["content_id"]
+	detail, err := c.contentDao.First(contentID)
 	if err != nil {
 		return nil, err
 	}
 	result, err := json.Marshal(map[string]interface{}{
 		"title":      detail.Title,
 		"video_url":  detail.VideoURL,
-		"content_id": detail.ID,
+		"content_id": detail.ContentID,
 	})
 	if err != nil {
 		return nil, err
@@ -98,11 +98,12 @@ func (c *ContentFlow) verify(data []byte, option map[string][]string) ([]byte, e
 		id       = detail["content_id"]
 	)
 	// 机器审核/人工审核
-	if int(id.(float64))%2 == 0 {
-		detail["approval_status"] = 3
-	} else {
-		detail["approval_status"] = 2
-	}
+	// if int(id.(float64))%2 == 0 {
+	// 	detail["approval_status"] = 3
+	// } else {
+	// 	detail["approval_status"] = 2
+	// }
+	detail["approval_status"] = 2
 	fmt.Println(id, title, videoURL)
 	return json.Marshal(detail)
 }
@@ -114,7 +115,7 @@ func (c *ContentFlow) category(data []byte, option map[string][]string) ([]byte,
 	if err := json.Unmarshal(data, &input); err != nil {
 		return nil, err
 	}
-	contentID := int64(input["content_id"].(float64))
+	contentID := input["content_id"].(string)
 	err := c.contentDao.UpdateByID(contentID, "category", "category")
 	if err != nil {
 		return nil, err
@@ -129,7 +130,7 @@ func (c *ContentFlow) thumbnail(data []byte, option map[string][]string) ([]byte
 	if err := json.Unmarshal(data, &input); err != nil {
 		return nil, err
 	}
-	contentID := int64(input["content_id"].(float64))
+	contentID := input["content_id"].(string)
 	err := c.contentDao.UpdateByID(contentID, "thumbnail", "thumbnail")
 	if err != nil {
 		return nil, err
@@ -144,7 +145,7 @@ func (c *ContentFlow) format(data []byte, option map[string][]string) ([]byte, e
 	if err := json.Unmarshal(data, &input); err != nil {
 		return nil, err
 	}
-	contentID := int64(input["content_id"].(float64))
+	contentID := input["content_id"].(string)
 	err := c.contentDao.UpdateByID(contentID, "format", "format")
 	if err != nil {
 		return nil, err
@@ -159,7 +160,7 @@ func (c *ContentFlow) pass(data []byte, option map[string][]string) ([]byte, err
 	if err := json.Unmarshal(data, &input); err != nil {
 		return nil, err
 	}
-	contentID := int64(input["content_id"].(float64))
+	contentID := input["content_id"].(string)
 	err := c.contentDao.UpdateByID(contentID, "approval_status", 2)
 	if err != nil {
 		return nil, err
@@ -174,7 +175,7 @@ func (c *ContentFlow) fail(data []byte, option map[string][]string) ([]byte, err
 	if err := json.Unmarshal(data, &input); err != nil {
 		return nil, err
 	}
-	contentID := int64(input["content_id"].(float64))
+	contentID := input["content_id"].(string)
 	err := c.contentDao.UpdateByID(contentID, "approval_status", 3)
 	if err != nil {
 		return nil, err

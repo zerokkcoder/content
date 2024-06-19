@@ -17,7 +17,7 @@ func (a *AppService) CreateContent(ctx context.Context, req *operate.CreateConte
 	content := req.GetContent()
 	uc := a.uc
 	contentID := uuid.New().String()
-	id, err := uc.CreateContent(ctx, &biz.Content{
+	_, err := uc.CreateContent(ctx, &biz.Content{
 		ContentID:      contentID,
 		Title:          content.GetTitle(),
 		VideoURL:       content.GetVideoUrl(),
@@ -36,19 +36,19 @@ func (a *AppService) CreateContent(ctx context.Context, req *operate.CreateConte
 		return nil, err
 	}
 	// 执行工作流
-	if err := a.ExecFlow(id); err != nil {
+	if err := a.ExecFlow(contentID); err != nil {
 		return nil, err
 	}
 
 	return &operate.CreateContentRsp{}, nil
 }
 
-func (a *AppService) ExecFlow(id int64) error {
+func (a *AppService) ExecFlow(contentID string) error {
 	url := "http://localhost:7788/flow/content-flow"
 	method := "GET"
 
 	payload := map[string]interface{}{
-		"content_id": id,
+		"content_id": contentID,
 	}
 	data, _ := json.Marshal(payload)
 

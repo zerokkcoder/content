@@ -2,11 +2,33 @@ package dao
 
 import (
 	"fmt"
+	"hash/fnv"
 	"log"
+	"math/big"
 
 	"github.com/zerokkcoder/content-flow/internal/model"
 	"gorm.io/gorm"
 )
+
+const contentNumTables = 4
+
+func getContentDetailTable(contentID string) string {
+	tableIndex := getContentTableIndex(contentID)
+	table := fmt.Sprintf("cms_content.t_content_details_%d", tableIndex)
+	return table
+}
+
+func getContentTableIndex(uuid string) int {
+	hash := fnv.New64()
+	hash.Write([]byte(uuid))
+	hashValue := hash.Sum64()
+	fmt.Println("hashValue = ", hashValue)
+
+	bigNum := big.NewInt(int64(hashValue))
+	mod := big.NewInt(contentNumTables)
+	tableIndex := bigNum.Mod(bigNum, mod).Int64()
+	return int(tableIndex)
+}
 
 type ContentDao struct {
 	db *gorm.DB
@@ -16,9 +38,10 @@ func NewContentDao(db *gorm.DB) *ContentDao {
 	return &ContentDao{db: db}
 }
 
-func (c *ContentDao) First(contentID int64) (*model.ContentDetail, error) {
+func (c *ContentDao) First(contentID string) (*model.ContentDetail, error) {
 	var detail model.ContentDetail
-	if err := c.db.Where("id = ?", contentID).First(&detail).Error; err != nil {
+	if err := c.db.Table(getContentDetailTable(contentID)).
+		Where("content_id = ?", contentID).First(&detail).Error; err != nil {
 		fmt.Printf("ContentDao First error = %v\n", err)
 		return nil, err
 	}
@@ -108,9 +131,9 @@ func (c *ContentDao) Find(params *FindParams) ([]*model.ContentDetail, int64, er
 	return data, total, nil
 }
 
-func (c *ContentDao) UpdateByID(id int64, column string, value interface{}) error {
-	if err := c.db.Model(&model.ContentDetail{}).
-		Where("id = ?", id).
+func (c *ContentDao) UpdateByID(contentID string, column string, value interface{}) error {
+	if err := c.db.Table(getContentDetailTable(contentID)).
+		Where("content_id = ?", contentID).
 		Update(column, value).Error; err != nil {
 		log.Printf("ContentDao UpdateByID error = %v\n", err)
 		return err
