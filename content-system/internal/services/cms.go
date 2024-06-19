@@ -3,10 +3,12 @@ package services
 import (
 	"context"
 
+	"github.com/go-kratos/kratos/contrib/registry/etcd/v2"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
 	"github.com/redis/go-redis/v9"
 	"github.com/zerokkcoder/content-system/internal/api/operate"
+	clientv3 "go.etcd.io/etcd/client/v3"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -34,18 +36,30 @@ func NewCmsApp() *CmsApp {
 }
 
 func (app *CmsApp) connOperateAppClient() {
+	// new etcd client
+	client, err := clientv3.New(clientv3.Config{
+		Endpoints: []string{"127.0.0.1:2379"},
+	})
+	if err != nil {
+		panic(err)
+	}
+	// new dis with etcd client
+	dis := etcd.New(client)
+	endpoint := "discovery:///content_system"
 	conn, err := grpc.DialInsecure(
 		context.Background(),
-		grpc.WithEndpoint("localhost:9000"),
+		// grpc.WithEndpoint("localhost:9000"),
 		grpc.WithMiddleware(
 			recovery.Recovery(),
 		),
+		grpc.WithEndpoint(endpoint),
+		grpc.WithDiscovery(dis),
 	)
 	if err != nil {
 		panic(err)
 	}
-	client := operate.NewAppClient(conn)
-	app.operationAppClient = client
+	appClient := operate.NewAppClient(conn)
+	app.operationAppClient = appClient
 }
 
 func (app *CmsApp) connDB() {
