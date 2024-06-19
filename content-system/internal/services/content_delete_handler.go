@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/zerokkcoder/content-system/internal/dao"
+	"github.com/zerokkcoder/content-system/internal/api/operate"
 )
 
 type ContentDeleteReq struct {
@@ -23,23 +23,9 @@ func (ca *CmsApp) ContentDelete(c *gin.Context) {
 		})
 		return
 	}
-	contentDao := dao.NewContentDao(ca.db)
-	// 判断是否存在
-	isExist, err := contentDao.IsExist(req.ID)
+
+	rsp, err := ca.operationAppClient.DeleteContent(c, &operate.DeleteContentReq{Id: req.ID})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
-	if !isExist {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "内容不存在",
-		})
-		return
-	}
-	// 删除
-	if err := contentDao.Delete(req.ID) ; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
@@ -49,6 +35,6 @@ func (ca *CmsApp) ContentDelete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"code": 0,
 		"msg":  "ok",
-		"data": ContentDeleteRsp{Message: "ok"},
+		"data": rsp,
 	})
 }
