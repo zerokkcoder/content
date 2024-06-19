@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/opentracing/opentracing-go"
 	"github.com/zerokkcoder/content-system/internal/dao"
 	"github.com/zerokkcoder/content-system/internal/utils"
 	"golang.org/x/crypto/bcrypt"
@@ -25,6 +26,7 @@ type LoginRsp struct {
 }
 
 func (ca *CmsApp) Login(c *gin.Context) {
+	span := opentracing.SpanFromContext(c.Request.Context())
 	var req LoginReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -32,8 +34,9 @@ func (ca *CmsApp) Login(c *gin.Context) {
 		})
 		return
 	}
+	span.SetTag("req", req)
 	accountDao := dao.NewAccountDao(ca.db)
-	account, err := accountDao.FirstByUsername(req.Username)
+	account, err := accountDao.FirstByUsername(c.Request.Context(), req.Username)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "账号不存在",
@@ -49,7 +52,7 @@ func (ca *CmsApp) Login(c *gin.Context) {
 	}
 	// 登录成功
 	// 生成session
-	sessionID, err := ca.genetateSessionID(context.Background(), account.Username)
+	sessionID, err := ca.genetateSessionID(c.Request.Context(), account.Username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "系统错误，请稍后重试",
@@ -69,6 +72,9 @@ func (ca *CmsApp) Login(c *gin.Context) {
 }
 
 func (ca *CmsApp) genetateSessionID(ctx context.Context, username string) (string, error) {
+	span, _ := opentracing.StartSpanFromContext(ctx, "genetateSessionID")
+	defer span.Finish()
+
 	// session id 生成
 	sessionID := uuid.New().String()
 	// key: session_id:{username} val: session_id 20s

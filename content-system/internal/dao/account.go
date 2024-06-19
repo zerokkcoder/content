@@ -1,6 +1,7 @@
 package dao
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/zerokkcoder/content-system/internal/model"
@@ -36,11 +37,11 @@ func (a *AccountDao) Create(account *model.Account) error {
 	return nil
 }
 
-func (a *AccountDao) FirstByUsername(username string) (*model.Account, error) {
+func (a *AccountDao) FirstByUsername(ctx context.Context, username string) (*model.Account, error) {
 	var account model.Account
-	if err := a.db.Where("username = ?", username).First(&account).Error; err != nil {
+	if err := a.db.WithContext(ctx).Where("username = ?", username).First(&account).Error; err != nil {
 		fmt.Printf("AccountDao FirstByUsername error = %v\n", err)
 		return nil, err
 	}
-	return &account, nil  
+	return &account, nil
 }

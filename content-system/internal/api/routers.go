@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/zerokkcoder/content-system/internal/services"
 )
 
@@ -13,6 +14,8 @@ const (
 func CmsRouters(r *gin.Engine) {
 	cmsApp := services.NewCmsApp()
 	session := NewSessionAuth()
+	// 开启监控上报
+	r.Use(prometheusMiddleware(), opentracingMiddleware())
 	root := r.Group(rootPath).Use(session.Auth)
 	{
 		// /api/cms/ping
@@ -34,4 +37,7 @@ func CmsRouters(r *gin.Engine) {
 		// /out/api/cms/login
 		noAuth.POST("/cms/login", cmsApp.Login)
 	}
+
+	// http://localhost:8080/metrics
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 }
