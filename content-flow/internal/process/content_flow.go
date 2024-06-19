@@ -18,10 +18,29 @@ func ExecContentFlow(db *gorm.DB) {
 	fs := goflow.FlowService{
 		Port:              7788,
 		RedisURL:          "localhost:6379",
-		WorkerConcurrency: 5,
+		WorkerConcurrency: 1,
 	}
 	_ = fs.Register("content-flow", contentFlow.flowHandle)
-	_ = fs.Start()
+	err := fs.Start()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func ExecContentWork(db *gorm.DB) {
+	contentFlow := &ContentFlow{
+		contentDao: dao.NewContentDao(db),
+	}
+	fs := goflow.FlowService{
+		Port:              7788,
+		RedisURL:          "localhost:6379",
+		WorkerConcurrency: 4,
+	}
+	_ = fs.Register("content-flow", contentFlow.flowHandle)
+	err := fs.StartWorker()
+	if err != nil {
+		panic(err)
+	}
 }
 
 type ContentFlow struct {
